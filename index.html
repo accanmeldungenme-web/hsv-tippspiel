@@ -65,7 +65,6 @@
     <header class="bg-[#001233]/90 backdrop-blur-md border-b border-blue-900/50 sticky top-0 z-40 shadow-lg">
         <div class="max-w-4xl mx-auto px-4 py-3.5 flex items-center justify-between">
             <div class="flex items-center gap-3">
-                <!-- Präzises HSV Raute Logo: Äußeres Quadrat blau, äußere Raute weiß, mittlere Raute schwarz, innere Raute weiß -->
                 <svg viewBox="0 0 100 100" class="w-11 h-11 shrink-0 shadow-lg transition-transform hover:scale-105 duration-300">
                     <rect x="0" y="0" width="100" height="100" fill="#003399" rx="12"/>
                     <polygon points="50,10 90,50 50,90 10,50" fill="#ffffff" />
@@ -76,7 +75,7 @@
                     <h1 class="text-base sm:text-xl font-black tracking-tight text-white flex items-center gap-2">
                         HSV-TIPPSPIEL <span class="bg-clip-text text-transparent bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-200">JACKPOT</span>
                     </h1>
-                    <p class="text-[11px] text-blue-200 font-medium">Live Synchronisiert • 0,50 € pro Spiel</p>
+                    <p class="text-[11px] text-blue-200 font-medium">GitHub Pages Edition • 0,50 € pro Spiel</p>
                 </div>
             </div>
 
@@ -101,8 +100,8 @@
 
         <!-- Sync Indicator Banner -->
         <div id="sync-status-banner" class="bg-emerald-900/40 border border-emerald-500/30 text-emerald-200 px-4 py-2 rounded-xl text-xs font-medium flex items-center justify-between">
-            <span class="flex items-center gap-2"><i class="fas fa-cloud text-emerald-400 animate-pulse"></i> Live-Cloud Synchronisation aktiv</span>
-            <span id="sync-user-info" class="text-[10px] text-emerald-300/80 font-mono"></span>
+            <span class="flex items-center gap-2"><i class="fas fa-database text-emerald-400 animate-pulse"></i> Lokaler Speicher / GitHub-Modus aktiv</span>
+            <span id="sync-user-info" class="text-[10px] text-emerald-300/80 font-mono">Modus: Browser-Storage</span>
         </div>
 
         <!-- Jackpot Banner Card -->
@@ -325,86 +324,107 @@
         import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
         import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
 
-        const appId = typeof __app_id !== 'undefined' ? __app_id : 'hsv-tippspiel-public-app';
-        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "demo", projectId: "demo" };
-        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
-
-        const app = initializeApp(firebaseConfig);
-        const db = getFirestore(app);
-        const auth = getAuth(app);
-
         const ADMIN_PASS = '1887';
         let isAdminLoggedIn = false;
         let confirmCallback = null;
-        let userId = null;
 
-        let state = {
+        const LOCAL_STORAGE_KEY = 'hsv_tippspiel_data_v1';
+
+        let defaultState = {
             jackpot: 0.00,
             players: ['Tim', 'Jan', 'Lukas'],
             manualAdjustments: {},
-            matches: []
+            matches: [
+                {
+                    id: 'm1',
+                    homeTeam: 'Hamburger SV',
+                    awayTeam: 'Hertha BSC',
+                    time: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16),
+                    status: 'OPEN',
+                    publishTips: false,
+                    result: null,
+                    tips: []
+                }
+            ]
         };
 
-        async function initAuthAndSync() {
+        let state = loadInitialState();
+
+        function loadInitialState() {
             try {
-                if (initialAuthToken) {
-                    await signInWithCustomToken(auth, initialAuthToken);
-                } else {
-                    await signInAnonymously(auth);
+                const saved = localStorage.getItem(LOCAL_STORAGE_KEY);
+                if (saved) {
+                    return JSON.parse(saved);
                 }
-                userId = auth.currentUser?.uid || crypto.randomUUID();
-                document.getElementById('sync-user-info').textContent = `ID: ${userId.substring(0, 6)}...`;
-                
-                startFirestoreListener();
-            } catch (err) {
-                console.error("Auth error:", err);
-                renderApp();
+            } catch (e) {
+                console.error("Local storage load error:", e);
+            }
+            return defaultState;
+        }
+
+        function saveStateToLocal() {
+            try {
+                localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(state));
+            } catch (e) {
+                console.error("Local storage save error:", e);
             }
         }
 
-        function startFirestoreListener() {
-            if (!auth.currentUser) return;
-            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tippspiel_main');
+        async function initAuthAndSync() {
+            // Check if Firebase config variables are available in environment
+            const appId = typeof __app_id !== 'undefined' ? __app_id : 'hsv-tippspiel-public-app';
+            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
 
-            onSnapshot(docRef, (docSnap) => {
-                if (docSnap.exists()) {
-                    const data = docSnap.data();
-                    if (data && data.matches) {
-                        state = data;
-                        if (!state.manualAdjustments) state.manualAdjustments = {};
-                        renderApp();
+            if (firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey !== "demo") {
+                try {
+                    const app = initializeApp(firebaseConfig);
+                    const db = getFirestore(app);
+                    const auth = getAuth(app);
+
+                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
+                        await signInWithCustomToken(auth, __initial_auth_token);
+                    } else {
+                        await signInAnonymously(auth);
                     }
-                } else {
-                    const initialMatch = {
-                        id: 'm1',
-                        homeTeam: 'Hamburger SV',
-                        awayTeam: 'Hertha BSC',
-                        time: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16),
-                        status: 'OPEN',
-                        publishTips: false,
-                        result: null,
-                        tips: []
-                    };
-                    state.matches = [initialMatch];
-                    saveStateToFirestore();
+                    
+                    document.getElementById('sync-user-info').textContent = `Cloud Synchronisiert`;
+                    
+                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tippspiel_main');
+                    onSnapshot(docRef, (docSnap) => {
+                        if (docSnap.exists()) {
+                            const data = docSnap.data();
+                            if (data && data.matches) {
+                                state = data;
+                                if (!state.manualAdjustments) state.manualAdjustments = {};
+                                renderApp();
+                            }
+                        } else {
+                            saveStateToCloud(docRef);
+                        }
+                    });
+                    return;
+                } catch (err) {
+                    console.log("Firebase not fully configured, falling back to local storage.", err);
                 }
-            }, (error) => {
-                console.error("Firestore listener error:", error);
-            });
+            }
+
+            // Fallback mode for GitHub Pages static hosting
+            document.getElementById('sync-user-info').textContent = `Lokaler Modus (GitHub Pages)`;
+            renderApp();
         }
 
-        async function saveStateToFirestore() {
-            if (!auth.currentUser) return;
+        async function saveStateToCloud(docRef) {
             try {
-                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tippspiel_main');
-                await setDoc(docRef, state);
+                if (docRef) {
+                    await setDoc(docRef, state);
+                }
             } catch (err) {
-                console.error("Error saving state:", err);
+                console.error("Error saving to cloud:", err);
             }
         }
 
         function markStateChanged() {
-            saveStateToFirestore();
+            saveStateToLocal();
             renderApp();
         }
 
@@ -554,7 +574,7 @@
                     homeGoals,
                     awayGoals
                 });
-                showCustomAlert('Gespeichert', `Tipp (${homeGoals}:${awayGoals}) erfolgreich in der Cloud hinterlegt!`);
+                showCustomAlert('Gespeichert', `Tipp (${homeGoals}:${awayGoals}) erfolgreich hinterlegt!`);
             }
 
             markStateChanged();
@@ -641,7 +661,7 @@
             if (!isNaN(val) && val >= 0) {
                 state.jackpot = val;
                 markStateChanged();
-                showCustomAlert('Gespeichert', 'Jackpot in der Cloud aktualisiert.');
+                showCustomAlert('Gespeichert', 'Jackpot aktualisiert.');
             }
         }
 
@@ -742,7 +762,7 @@
                 tips: []
             });
             markStateChanged();
-            showCustomAlert('Erfolg', 'Spiel in der Cloud angelegt.');
+            showCustomAlert('Erfolg', 'Spiel erfolgreich angelegt.');
             document.getElementById('admin-away-team').value = '';
         }
 
@@ -842,10 +862,7 @@
             match.payouts = {};
 
             const totalTips = match.tips.length;
-            const matchPool = totalTips * 0.50; // Gesamter Einsatz dieses Spiels
-            
-            // Regel: 50 Cent pro Person vor dem Spiel in Spielpreis, Rest direkt in Jackpot
-            // Bei z.B. 3 Spielern = 1,50 € Gesamtpool. 0,50 € Spielpreis, 1,00 € in den Jackpot.
+            const matchPool = totalTips * 0.50; 
             const gamePrice = Math.min(0.50, matchPool); 
             const addedToJackpot = Math.max(0, matchPool - 0.50);
             state.jackpot += addedToJackpot;
@@ -867,7 +884,6 @@
                 state.jackpot = 0.00;
                 showCustomAlert('JACKPOT!', `${exactTippers.join(', ')} gewinnen je ${formatEuro(winPerPlayer)}!`);
             } else if (tendencyTippers.length > 0) {
-                // Bei richtiger Tendenz genau 50 Cent (0,50 €) Auszahlung
                 const payoutTotal = Math.min(gamePrice, 0.50);
                 const winPerPlayer = payoutTotal / tendencyTippers.length;
                 tendencyTippers.forEach(p => match.payouts[p] = winPerPlayer);
@@ -925,7 +941,7 @@
                 <button type="button" id="modal-cancel-btn" class="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Abbrechen</button>
                 <button type="button" id="modal-prompt-submit-btn" class="bg-hsv-blue text-white px-4 py-2 rounded-xl text-xs font-extrabold cursor-pointer">Einloggen</button>
             `;
-            document.getElementById('custom-modal').classList.remove('hidden');
+            document.getElementById('custom-modal'].classList.remove('hidden');
             document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
             document.getElementById('modal-prompt-submit-btn').addEventListener('click', () => {
                 const val = document.getElementById('prompt-input').value;
