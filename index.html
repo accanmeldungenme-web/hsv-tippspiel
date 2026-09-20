@@ -100,8 +100,8 @@
 
         <!-- Sync Indicator Banner -->
         <div id="sync-status-banner" class="bg-emerald-900/40 border border-emerald-500/30 text-emerald-200 px-4 py-2 rounded-xl text-xs font-medium flex items-center justify-between">
-            <span class="flex items-center gap-2"><i class="fas fa-database text-emerald-400 animate-pulse"></i> Lokaler Speicher / GitHub-Modus aktiv</span>
-            <span id="sync-user-info" class="text-[10px] text-emerald-300/80 font-mono">Modus: Browser-Storage</span>
+            <span class="flex items-center gap-2"><i class="fas fa-database text-emerald-400 animate-pulse"></i> GitHub Pages Lokal-Modus aktiv (Daten werden im Browser gespeichert)</span>
+            <span id="sync-user-info" class="text-[10px] text-emerald-300/80 font-mono">v1.1</span>
         </div>
 
         <!-- Jackpot Banner Card -->
@@ -319,11 +319,7 @@
         </div>
     </div>
 
-    <script type="module">
-        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
-        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
-        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
-
+    <script>
         const ADMIN_PASS = '1887';
         let isAdminLoggedIn = false;
         let confirmCallback = null;
@@ -370,66 +366,13 @@
             }
         }
 
-        async function initAuthAndSync() {
-            // Check if Firebase config variables are available in environment
-            const appId = typeof __app_id !== 'undefined' ? __app_id : 'hsv-tippspiel-public-app';
-            const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : null;
-
-            if (firebaseConfig && firebaseConfig.apiKey && firebaseConfig.apiKey !== "demo") {
-                try {
-                    const app = initializeApp(firebaseConfig);
-                    const db = getFirestore(app);
-                    const auth = getAuth(app);
-
-                    if (typeof __initial_auth_token !== 'undefined' && __initial_auth_token) {
-                        await signInWithCustomToken(auth, __initial_auth_token);
-                    } else {
-                        await signInAnonymously(auth);
-                    }
-                    
-                    document.getElementById('sync-user-info').textContent = `Cloud Synchronisiert`;
-                    
-                    const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tippspiel_main');
-                    onSnapshot(docRef, (docSnap) => {
-                        if (docSnap.exists()) {
-                            const data = docSnap.data();
-                            if (data && data.matches) {
-                                state = data;
-                                if (!state.manualAdjustments) state.manualAdjustments = {};
-                                renderApp();
-                            }
-                        } else {
-                            saveStateToCloud(docRef);
-                        }
-                    });
-                    return;
-                } catch (err) {
-                    console.log("Firebase not fully configured, falling back to local storage.", err);
-                }
-            }
-
-            // Fallback mode for GitHub Pages static hosting
-            document.getElementById('sync-user-info').textContent = `Lokaler Modus (GitHub Pages)`;
-            renderApp();
-        }
-
-        async function saveStateToCloud(docRef) {
-            try {
-                if (docRef) {
-                    await setDoc(docRef, state);
-                }
-            } catch (err) {
-                console.error("Error saving to cloud:", err);
-            }
-        }
-
         function markStateChanged() {
             saveStateToLocal();
             renderApp();
         }
 
         window.addEventListener('DOMContentLoaded', () => {
-            initAuthAndSync();
+            renderApp();
 
             // Header Button Listeners
             document.getElementById('header-ics-btn').addEventListener('click', downloadICS);
@@ -941,7 +884,7 @@
                 <button type="button" id="modal-cancel-btn" class="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Abbrechen</button>
                 <button type="button" id="modal-prompt-submit-btn" class="bg-hsv-blue text-white px-4 py-2 rounded-xl text-xs font-extrabold cursor-pointer">Einloggen</button>
             `;
-            document.getElementById('custom-modal'].classList.remove('hidden');
+            document.getElementById('custom-modal').classList.remove('hidden');
             document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
             document.getElementById('modal-prompt-submit-btn').addEventListener('click', () => {
                 const val = document.getElementById('prompt-input').value;
