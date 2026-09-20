@@ -1,0 +1,946 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HSV-Tippspiel mit Jackpot</title>
+
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        hsv: {
+                            blue: '#003399',
+                            darkblue: '#001a4d',
+                            skyblue: '#1e40af',
+                            cardbg: '#ffffff',
+                            gold: '#fbbf24',
+                            goldbright: '#ffcc00',
+                            red: '#e2001a'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        body {
+            font-family: system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            background: linear-gradient(135deg, #001a4d 0%, #002677 50%, #001233 100%);
+            color: #ffffff;
+            min-height: 100vh;
+        }
+        .gold-glow {
+            box-shadow: 0 10px 30px -5px rgba(251, 191, 36, 0.3);
+        }
+        .card-white {
+            background: rgba(255, 255, 255, 0.96);
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.2);
+            box-shadow: 0 10px 30px -5px rgba(0, 0, 0, 0.25);
+            color: #0f172a;
+        }
+        .custom-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .custom-scrollbar::-webkit-scrollbar-track {
+            background: #001a4d;
+        }
+        .custom-scrollbar::-webkit-scrollbar-thumb {
+            background: #3b82f6;
+            border-radius: 9999px;
+        }
+        input[type=number] {
+            color-scheme: light;
+        }
+    </style>
+</head>
+<body class="pb-16">
+
+    <header class="bg-[#001233]/90 backdrop-blur-md border-b border-blue-900/50 sticky top-0 z-40 shadow-lg">
+        <div class="max-w-4xl mx-auto px-4 py-3.5 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <!-- Präzises HSV Raute Logo: Äußeres Quadrat blau, äußere Raute weiß, mittlere Raute schwarz, innere Raute weiß -->
+                <svg viewBox="0 0 100 100" class="w-11 h-11 shrink-0 shadow-lg transition-transform hover:scale-105 duration-300">
+                    <rect x="0" y="0" width="100" height="100" fill="#003399" rx="12"/>
+                    <polygon points="50,10 90,50 50,90 10,50" fill="#ffffff" />
+                    <polygon points="50,22 78,50 50,78 22,50" fill="#000000" />
+                    <polygon points="50,38 62,50 50,62 38,50" fill="#ffffff" />
+                </svg>
+                <div>
+                    <h1 class="text-base sm:text-xl font-black tracking-tight text-white flex items-center gap-2">
+                        HSV-TIPPSPIEL <span class="bg-clip-text text-transparent bg-gradient-to-r from-amber-300 via-yellow-400 to-amber-200">JACKPOT</span>
+                    </h1>
+                    <p class="text-[11px] text-blue-200 font-medium">Live Synchronisiert • 0,50 € pro Spiel</p>
+                </div>
+            </div>
+
+            <div class="flex items-center gap-2">
+                <button type="button" id="header-ics-btn" class="bg-amber-400/20 hover:bg-amber-400/30 text-amber-300 text-xs font-bold py-2 px-3 rounded-xl border border-amber-400/30 transition-all active:scale-95 flex items-center gap-1.5 shadow-sm cursor-pointer" title="Kalender-Erinnerung herunterladen">
+                    <i class="fas fa-calendar-plus text-amber-300"></i>
+                    <span class="hidden sm:inline">Erinnerung</span>
+                </button>
+                <button type="button" id="header-rules-btn" class="bg-white/10 hover:bg-white/20 text-white text-xs font-bold py-2 px-3.5 rounded-xl border border-white/20 transition-all active:scale-95 flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <i class="fas fa-book-open text-amber-300"></i>
+                    <span class="hidden sm:inline">Regeln</span>
+                </button>
+                <button type="button" id="admin-toggle-btn" class="bg-hsv-blue hover:bg-blue-600 text-white text-xs font-extrabold py-2 px-3.5 rounded-xl border border-blue-400/40 transition-all active:scale-95 flex items-center gap-1.5 shadow-sm cursor-pointer">
+                    <i class="fas fa-user-gear"></i>
+                    <span id="admin-btn-label">Admin Login</span>
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-4xl mx-auto px-4 mt-6 space-y-6">
+
+        <!-- Sync Indicator Banner -->
+        <div id="sync-status-banner" class="bg-emerald-900/40 border border-emerald-500/30 text-emerald-200 px-4 py-2 rounded-xl text-xs font-medium flex items-center justify-between">
+            <span class="flex items-center gap-2"><i class="fas fa-cloud text-emerald-400 animate-pulse"></i> Live-Cloud Synchronisation aktiv</span>
+            <span id="sync-user-info" class="text-[10px] text-emerald-300/80 font-mono"></span>
+        </div>
+
+        <!-- Jackpot Banner Card -->
+        <div class="bg-gradient-to-br from-[#001a4d] via-[#003399] to-blue-900 p-6 rounded-3xl border border-blue-300/30 gold-glow relative overflow-hidden shadow-2xl text-white">
+            <div class="absolute -right-6 -bottom-10 text-white/10 text-9xl font-black pointer-events-none select-none">
+                €
+            </div>
+            
+            <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 relative z-10">
+                <div>
+                    <span class="text-xs uppercase font-extrabold tracking-widest text-amber-300 flex items-center gap-2 bg-amber-400/20 px-3 py-1 rounded-full w-fit border border-amber-400/30">
+                        <i class="fas fa-sack-dollar text-amber-300 animate-bounce"></i> Aktueller Jackpot-Stand
+                    </span>
+                    <div class="text-4xl sm:text-6xl font-black text-white mt-2 tracking-tight flex items-baseline gap-2" id="jackpot-display">
+                        0,00 €
+                    </div>
+                    <p class="text-xs text-blue-100 mt-1 font-medium">Der Jackpot wächst mit jedem Spiel ohne Hauptgewinner!</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Admin Dashboard -->
+        <section id="admin-panel" class="hidden card-white p-6 rounded-3xl border-2 border-hsv-blue space-y-6 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+                <h2 class="text-lg font-black text-hsv-darkblue flex items-center gap-2">
+                    <i class="fas fa-shield-halved text-hsv-blue"></i> Admin Dashboard
+                </h2>
+                <span class="text-xs bg-emerald-100 text-emerald-800 border border-emerald-300 px-3 py-1 rounded-full font-extrabold shadow-sm">
+                    <i class="fas fa-check-circle mr-1 text-emerald-600"></i> Angemeldet
+                </span>
+            </div>
+
+            <!-- Jackpot-Verwaltung -->
+            <div class="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
+                <h3 class="text-xs font-extrabold uppercase text-hsv-darkblue tracking-wider flex items-center gap-2">
+                    <i class="fas fa-coins text-amber-600"></i> Jackpot manuell anpassen
+                </h3>
+                <div class="flex flex-col sm:flex-row items-stretch sm:items-end gap-3">
+                    <div class="flex-grow">
+                        <label class="block text-xs text-slate-700 mb-1 font-semibold">Neuer Jackpot-Betrag (€)</label>
+                        <div class="relative">
+                            <input type="number" step="0.50" min="0" id="admin-jackpot-input" placeholder="0.00" class="w-full bg-white border border-slate-300 rounded-xl pl-3.5 pr-8 py-2.5 text-slate-900 font-black text-sm focus:outline-none focus:border-hsv-blue transition-colors">
+                            <span class="absolute right-3.5 top-2.5 text-slate-500 text-sm font-bold">€</span>
+                        </div>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button type="button" id="admin-save-jackpot-btn" class="bg-hsv-blue hover:bg-blue-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition border border-blue-400/30 flex items-center gap-1.5 h-[42px] shadow-sm cursor-pointer">
+                            <i class="fas fa-floppy-disk"></i> Speichern
+                        </button>
+                        <button type="button" id="admin-reset-jackpot-btn" class="bg-red-50 hover:bg-red-100 text-red-700 font-bold py-2.5 px-4 rounded-xl text-xs transition border border-red-200 flex items-center gap-1.5 h-[42px] whitespace-nowrap shadow-sm cursor-pointer">
+                            <i class="fas fa-rotate-left"></i> Auf 0,00 € setzen
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tipper-Bilanzen manuell anpassen -->
+            <div class="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
+                <h3 class="text-xs font-extrabold uppercase text-hsv-darkblue tracking-wider flex items-center gap-2">
+                    <i class="fas fa-sliders text-hsv-blue"></i> Gewinne & Verluste manuell anpassen
+                </h3>
+                <div id="admin-player-balances-edit" class="space-y-2"></div>
+            </div>
+
+            <!-- Tipper-Verwaltung -->
+            <div class="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
+                <h3 class="text-xs font-extrabold uppercase text-hsv-darkblue tracking-wider flex items-center gap-2">
+                    <i class="fas fa-users-gear text-hsv-blue"></i> Registrierte Tipper (Nur Vorname)
+                </h3>
+                <form id="admin-add-player-form" class="flex gap-2">
+                    <input type="text" id="admin-new-player" placeholder="Nur Vorname eingeben..." required class="flex-grow bg-white border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs focus:outline-none focus:border-hsv-blue transition-colors">
+                    <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 px-4 rounded-xl text-xs transition flex items-center gap-1.5 shadow-sm cursor-pointer">
+                        <i class="fas fa-plus"></i> Hinzufügen
+                    </button>
+                </form>
+                <div id="registered-players-list" class="flex flex-wrap gap-2 pt-2"></div>
+            </div>
+
+            <!-- Neues Spiel erstellen -->
+            <div class="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
+                <h3 class="text-xs font-extrabold uppercase text-hsv-darkblue tracking-wider flex items-center gap-2">
+                    <i class="fas fa-calendar-plus text-hsv-blue"></i> Neues Spiel anlegen
+                </h3>
+                <form id="admin-create-match-form" class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                        <label class="block text-[11px] text-slate-700 mb-1 font-semibold">Heimteam</label>
+                        <input type="text" id="admin-home-team" value="Hamburger SV" required class="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 text-xs focus:outline-none focus:border-hsv-blue">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-700 mb-1 font-semibold">Auswärtsteam</label>
+                        <input type="text" id="admin-away-team" placeholder="Gegner z. B. FC Schalke 04" required class="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 text-xs focus:outline-none focus:border-hsv-blue">
+                    </div>
+                    <div>
+                        <label class="block text-[11px] text-slate-700 mb-1 font-semibold">Anstoß Datum / Zeit</label>
+                        <input type="datetime-local" id="admin-match-time" required class="w-full bg-white border border-slate-300 rounded-xl px-3.5 py-2 text-slate-900 text-xs focus:outline-none focus:border-hsv-blue">
+                    </div>
+                    <div class="sm:col-span-3 flex justify-end">
+                        <button type="submit" class="bg-hsv-blue hover:bg-blue-700 text-white font-bold py-2.5 px-5 rounded-xl text-xs transition flex items-center gap-2 shadow-md cursor-pointer">
+                            <i class="fas fa-save"></i> Spiel speichern
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <!-- Spiele verwalten -->
+            <div class="bg-slate-50 p-4 sm:p-5 rounded-2xl border border-slate-200 space-y-3">
+                <h3 class="text-xs font-extrabold uppercase text-hsv-darkblue tracking-wider flex items-center gap-2">
+                    <i class="fas fa-list-check text-hsv-blue"></i> Spiele & Abgegebene Tipps verwalten
+                </h3>
+                <div id="admin-matches-list" class="space-y-4"></div>
+            </div>
+        </section>
+
+        <!-- Bilanzen Übersicht -->
+        <section class="card-white p-5 sm:p-6 rounded-3xl space-y-4">
+            <h2 class="text-xs font-extrabold uppercase tracking-widest text-hsv-darkblue flex items-center gap-2">
+                <i class="fas fa-trophy text-amber-500 text-sm"></i> Aktuelle Bilanzen (Gewinn / Verlust)
+            </h2>
+            <div id="player-balances-container" class="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3"></div>
+        </section>
+
+        <!-- Public Tipp Formular -->
+        <section class="card-white p-5 sm:p-6 rounded-3xl space-y-5">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-3">
+                <h2 class="text-xs font-extrabold uppercase tracking-widest text-hsv-darkblue flex items-center gap-2">
+                    <i class="fas fa-pen-to-square text-hsv-blue text-sm"></i> Tipp abgeben
+                </h2>
+                <span class="text-xs text-hsv-blue font-bold bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
+                    0,50 € Einsatz / Spiel
+                </span>
+            </div>
+
+            <form id="public-tip-form" class="space-y-5">
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">Dein Name (Nur Vorname)</label>
+                        <select id="public-player-select" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs font-semibold focus:outline-none focus:border-hsv-blue focus:bg-white transition-colors"></select>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-bold text-slate-700 mb-1.5">Spiel auswählen</label>
+                        <select id="public-match-select" required class="w-full bg-slate-50 border border-slate-300 rounded-xl px-3.5 py-2.5 text-slate-900 text-xs font-semibold focus:outline-none focus:border-hsv-blue focus:bg-white transition-colors"></select>
+                    </div>
+                </div>
+
+                <div class="bg-gradient-to-br from-blue-50 to-slate-100 p-5 rounded-2xl border border-blue-200 flex items-center justify-center gap-6 shadow-inner">
+                    <div class="text-center">
+                        <label class="block text-xs font-bold text-slate-700 mb-2 truncate max-w-[120px]" id="label-home-team">Heim</label>
+                        <input type="number" min="0" max="20" id="tip-home-goals" required placeholder="0" class="w-20 h-14 bg-white border-2 border-slate-300 rounded-2xl text-center font-black text-2xl text-slate-900 focus:outline-none focus:border-hsv-blue transition-all shadow-sm">
+                    </div>
+                    <span class="text-3xl font-black text-slate-400 mt-6">:</span>
+                    <div class="text-center">
+                        <label class="block text-xs font-bold text-slate-700 mb-2 truncate max-w-[120px]" id="label-away-team">Auswärts</label>
+                        <input type="number" min="0" max="20" id="tip-away-goals" required placeholder="0" class="w-20 h-14 bg-white border-2 border-slate-300 rounded-2xl text-center font-black text-2xl text-slate-900 focus:outline-none focus:border-hsv-blue transition-all shadow-sm">
+                    </div>
+                </div>
+
+                <button type="submit" class="w-full bg-hsv-blue hover:bg-blue-700 text-white font-extrabold py-3.5 px-4 rounded-2xl transition-all border border-blue-500/30 flex items-center justify-center gap-2 shadow-lg active:scale-[0.99] cursor-pointer">
+                    <i class="fas fa-paper-plane text-amber-300"></i> Tipp jetzt einreichen
+                </button>
+            </form>
+        </section>
+
+        <!-- Abgegebene Tipps Ansicht -->
+        <section class="card-white p-5 sm:p-6 rounded-3xl space-y-4">
+            <h2 class="text-xs font-extrabold uppercase tracking-widest text-hsv-darkblue flex items-center gap-2">
+                <i class="fas fa-eye text-amber-500 text-sm"></i> Eingegangene Tipps & Ergebnisse
+            </h2>
+            <div id="public-tips-view" class="space-y-4"></div>
+        </section>
+
+    </main>
+
+    <!-- Custom Modal Dialog -->
+    <div id="custom-modal" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 max-w-sm w-full space-y-4 text-slate-900 shadow-2xl">
+            <h3 id="modal-title" class="text-base font-bold text-slate-900 flex items-center gap-2">
+                <i class="fas fa-circle-info text-hsv-blue"></i> Hinweis
+            </h3>
+            <p id="modal-message" class="text-xs text-slate-600 leading-relaxed"></p>
+            <div id="modal-actions" class="flex justify-end gap-2 pt-2"></div>
+        </div>
+    </div>
+
+    <!-- Regeln Modal -->
+    <div id="rules-modal" class="fixed inset-0 z-50 bg-slate-950/70 backdrop-blur-sm flex items-center justify-center p-4 hidden">
+        <div class="bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 max-w-xl w-full space-y-6 max-h-[90vh] overflow-y-auto custom-scrollbar text-slate-900 shadow-2xl">
+            <div class="flex items-center justify-between border-b border-slate-200 pb-4">
+                <h3 class="text-lg sm:text-xl font-black text-hsv-darkblue flex items-center gap-2.5">
+                    <i class="fas fa-scroll text-amber-500 text-xl"></i> HSV Tippspiel Regeln
+                </h3>
+                <button type="button" id="rules-close-btn" class="text-slate-400 hover:text-slate-700 text-xl w-9 h-9 rounded-xl hover:bg-slate-100 transition flex items-center justify-center cursor-pointer">
+                    <i class="fas fa-xmark"></i>
+                </button>
+            </div>
+            <div class="space-y-4 text-sm sm:text-base text-slate-700 leading-relaxed">
+                <div class="bg-blue-50 p-4 rounded-2xl border border-blue-200 flex items-start gap-3">
+                    <div class="w-8 h-8 rounded-xl bg-hsv-blue text-white flex items-center justify-center shrink-0 font-bold text-sm mt-0.5 shadow-sm">€</div>
+                    <div>
+                        <strong class="text-hsv-darkblue font-bold block text-base mb-0.5">Einsatz pro Spiel</strong>
+                        <p class="text-slate-600 text-sm"><strong>0,50 €</strong> pro Person und Spiel. 50 Cent gehen vor dem Spiel in den Spielpreis, der Rest direkt in den Jackpot.</p>
+                    </div>
+                </div>
+                <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-2 text-xs sm:text-sm">
+                    <h4 class="font-bold text-hsv-darkblue uppercase"><i class="fas fa-trophy text-amber-500"></i> Ausschüttung nach dem Spiel:</h4>
+                    <ul class="list-disc pl-5 space-y-1 text-slate-600">
+                        <li><strong>Exakter Tipp:</strong> Teilt sich den kompletten Spielpreis + vollen Jackpot. Jackpot wird auf 0 € zurückgesetzt.</li>
+                        <li><strong>Richtige Tendenz:</strong> Bekommt exakt <strong>0,50 €</strong> aus dem Spielpreis ausgezahlt. Der Rest wandert in den Jackpot.</li>
+                        <li><strong>Kein Treffer:</strong> Nichts ausgezahlt, der gesamte Spielpreis wandert in den Jackpot.</li>
+                    </ul>
+                </div>
+            </div>
+            <div class="flex justify-end pt-2 border-t border-slate-200">
+                <button type="button" id="rules-close-footer-btn" class="w-full sm:w-auto bg-hsv-blue hover:bg-blue-700 text-white font-extrabold py-3 px-8 rounded-xl text-sm transition shadow-md cursor-pointer">Alles klar!</button>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-app.js";
+        import { getAuth, signInAnonymously, signInWithCustomToken } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-auth.js";
+        import { getFirestore, doc, setDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.6.1/firebase-firestore.js";
+
+        const appId = typeof __app_id !== 'undefined' ? __app_id : 'hsv-tippspiel-public-app';
+        const firebaseConfig = typeof __firebase_config !== 'undefined' ? JSON.parse(__firebase_config) : { apiKey: "demo", projectId: "demo" };
+        const initialAuthToken = typeof __initial_auth_token !== 'undefined' ? __initial_auth_token : undefined;
+
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+        const auth = getAuth(app);
+
+        const ADMIN_PASS = '1887';
+        let isAdminLoggedIn = false;
+        let confirmCallback = null;
+        let userId = null;
+
+        let state = {
+            jackpot: 0.00,
+            players: ['Tim', 'Jan', 'Lukas'],
+            manualAdjustments: {},
+            matches: []
+        };
+
+        async function initAuthAndSync() {
+            try {
+                if (initialAuthToken) {
+                    await signInWithCustomToken(auth, initialAuthToken);
+                } else {
+                    await signInAnonymously(auth);
+                }
+                userId = auth.currentUser?.uid || crypto.randomUUID();
+                document.getElementById('sync-user-info').textContent = `ID: ${userId.substring(0, 6)}...`;
+                
+                startFirestoreListener();
+            } catch (err) {
+                console.error("Auth error:", err);
+                renderApp();
+            }
+        }
+
+        function startFirestoreListener() {
+            if (!auth.currentUser) return;
+            const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tippspiel_main');
+
+            onSnapshot(docRef, (docSnap) => {
+                if (docSnap.exists()) {
+                    const data = docSnap.data();
+                    if (data && data.matches) {
+                        state = data;
+                        if (!state.manualAdjustments) state.manualAdjustments = {};
+                        renderApp();
+                    }
+                } else {
+                    const initialMatch = {
+                        id: 'm1',
+                        homeTeam: 'Hamburger SV',
+                        awayTeam: 'Hertha BSC',
+                        time: new Date(Date.now() + 86400000 * 3).toISOString().slice(0, 16),
+                        status: 'OPEN',
+                        publishTips: false,
+                        result: null,
+                        tips: []
+                    };
+                    state.matches = [initialMatch];
+                    saveStateToFirestore();
+                }
+            }, (error) => {
+                console.error("Firestore listener error:", error);
+            });
+        }
+
+        async function saveStateToFirestore() {
+            if (!auth.currentUser) return;
+            try {
+                const docRef = doc(db, 'artifacts', appId, 'public', 'data', 'tippspiel_main');
+                await setDoc(docRef, state);
+            } catch (err) {
+                console.error("Error saving state:", err);
+            }
+        }
+
+        function markStateChanged() {
+            saveStateToFirestore();
+            renderApp();
+        }
+
+        window.addEventListener('DOMContentLoaded', () => {
+            initAuthAndSync();
+
+            // Header Button Listeners
+            document.getElementById('header-ics-btn').addEventListener('click', downloadICS);
+            document.getElementById('header-rules-btn').addEventListener('click', openRulesModal);
+            document.getElementById('admin-toggle-btn').addEventListener('click', toggleAdminPanel);
+
+            // Rules Modal Listeners
+            document.getElementById('rules-close-btn').addEventListener('click', closeRulesModal);
+            document.getElementById('rules-close-footer-btn').addEventListener('click', closeRulesModal);
+
+            // Admin & Public Actions
+            document.getElementById('admin-save-jackpot-btn').addEventListener('click', saveAdminJackpot);
+            document.getElementById('admin-reset-jackpot-btn').addEventListener('click', confirmResetJackpot);
+            document.getElementById('admin-add-player-form').addEventListener('submit', registerNewPlayer);
+            document.getElementById('admin-create-match-form').addEventListener('submit', createNewMatch);
+            document.getElementById('public-tip-form').addEventListener('submit', submitPublicTip);
+        });
+
+        function renderApp() {
+            renderJackpot();
+            renderBalances();
+            renderPlayerSelectOptions();
+            renderMatchSelectOptions();
+            renderPublicTipsView();
+
+            if (isAdminLoggedIn) {
+                renderAdminPlayerBalancesEdit();
+                renderRegisteredPlayersChips();
+                renderAdminMatchesList();
+            }
+        }
+
+        function renderJackpot() {
+            document.getElementById('jackpot-display').textContent = formatEuro(state.jackpot);
+            const input = document.getElementById('admin-jackpot-input');
+            if (input) input.value = state.jackpot.toFixed(2);
+        }
+
+        function renderBalances() {
+            const container = document.getElementById('player-balances-container');
+            container.innerHTML = '';
+
+            if (!state.players || state.players.length === 0) {
+                container.innerHTML = '<div class="col-span-full text-xs text-slate-500 italic">Noch keine Tipper vom Admin angelegt.</div>';
+                return;
+            }
+
+            state.players.forEach(playerName => {
+                let totalInvested = 0;
+                let totalPayout = 0;
+
+                state.matches.forEach(m => {
+                    if (m.status === 'EVALUATED') {
+                        const tip = m.tips.find(t => t.playerName === playerName);
+                        if (tip) {
+                            totalInvested += 0.50;
+                            if (m.payouts && m.payouts[playerName] !== undefined) {
+                                totalPayout += m.payouts[playerName];
+                            }
+                        }
+                    }
+                });
+
+                const autoBalance = totalPayout - totalInvested;
+                const adjustment = (state.manualAdjustments && state.manualAdjustments[playerName] !== undefined) ? state.manualAdjustments[playerName] : 0;
+                const netBalance = autoBalance + adjustment;
+                const isPositive = netBalance >= 0;
+
+                container.innerHTML += `
+                    <div class="bg-white p-3.5 rounded-2xl border ${isPositive ? 'border-emerald-300 bg-emerald-50/20' : 'border-red-300 bg-red-50/20'} flex flex-col justify-between shadow-sm text-slate-900">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-extrabold text-slate-800 truncate">${escapeHtml(playerName)}</span>
+                            ${adjustment !== 0 ? `<span class="text-[9px] bg-blue-100 text-blue-800 border border-blue-300 px-1.5 py-0.5 rounded-md font-semibold">Korrigiert</span>` : ''}
+                        </div>
+                        <div class="mt-2.5">
+                            <span class="text-base sm:text-lg font-black ${isPositive ? 'text-emerald-700' : 'text-red-600'}">
+                                ${isPositive ? '+' : ''}${formatEuro(netBalance)}
+                            </span>
+                        </div>
+                        <span class="text-[10px] text-slate-500 font-medium mt-1">Gewinn / Verlust</span>
+                    </div>
+                `;
+            });
+        }
+
+        function renderPlayerSelectOptions() {
+            const select = document.getElementById('public-player-select');
+            select.innerHTML = '<option value="">-- Bitte Vorname wählen --</option>';
+            state.players.forEach(p => {
+                select.innerHTML += `<option value="${escapeHtml(p)}">${escapeHtml(p)}</option>`;
+            });
+        }
+
+        function renderMatchSelectOptions() {
+            const select = document.getElementById('public-match-select');
+            select.innerHTML = '';
+
+            const openMatches = state.matches.filter(m => m.status === 'OPEN');
+            if (openMatches.length === 0) {
+                select.innerHTML = '<option value="">Keine offenen Spiele vorhanden</option>';
+                return;
+            }
+
+            openMatches.forEach(m => {
+                select.innerHTML += `<option value="${m.id}">${escapeHtml(m.homeTeam)} vs. ${escapeHtml(m.awayTeam)} (${formatDate(m.time)})</option>`;
+            });
+
+            updateTeamLabels();
+            select.onchange = updateTeamLabels;
+        }
+
+        function updateTeamLabels() {
+            const matchId = document.getElementById('public-match-select').value;
+            const match = state.matches.find(m => m.id === matchId);
+            if (match) {
+                document.getElementById('label-home-team').textContent = match.homeTeam;
+                document.getElementById('label-away-team').textContent = match.awayTeam;
+            }
+        }
+
+        function submitPublicTip(e) {
+            e.preventDefault();
+            const playerName = document.getElementById('public-player-select').value;
+            const matchId = document.getElementById('public-match-select').value;
+            const homeGoals = parseInt(document.getElementById('tip-home-goals').value);
+            const awayGoals = parseInt(document.getElementById('tip-away-goals').value);
+
+            if (!playerName || !matchId) return;
+
+            const match = state.matches.find(m => m.id === matchId);
+            if (!match || match.status !== 'OPEN') return;
+
+            const existingIndex = match.tips.findIndex(t => t.playerName === playerName);
+            if (existingIndex !== -1) {
+                match.tips[existingIndex].homeGoals = homeGoals;
+                match.tips[existingIndex].awayGoals = awayGoals;
+                showCustomAlert('Aktualisiert', `Dein Tipp (${homeGoals}:${awayGoals}) wurde geändert.`);
+            } else {
+                match.tips.push({
+                    id: 'tip_' + Date.now() + '_' + Math.random().toString(36).substring(2, 5),
+                    playerName,
+                    homeGoals,
+                    awayGoals
+                });
+                showCustomAlert('Gespeichert', `Tipp (${homeGoals}:${awayGoals}) erfolgreich in der Cloud hinterlegt!`);
+            }
+
+            markStateChanged();
+            document.getElementById('tip-home-goals').value = '';
+            document.getElementById('tip-away-goals').value = '';
+        }
+
+        function renderPublicTipsView() {
+            const container = document.getElementById('public-tips-view');
+            container.innerHTML = '';
+
+            if (state.matches.length === 0) {
+                container.innerHTML = '<div class="text-xs text-slate-500 italic">Derzeit keine Spiele angelegt.</div>';
+                return;
+            }
+
+            state.matches.forEach(m => {
+                const isEvaluated = m.status === 'EVALUATED';
+                const canSeeTips = isEvaluated || m.publishTips;
+                let tipsHtml = '';
+
+                if (m.tips.length === 0) {
+                    tipsHtml = '<span class="text-xs text-slate-400 italic">Noch keine Tipps eingegangen.</span>';
+                } else if (!canSeeTips) {
+                    tipsHtml = `<div class="text-xs text-amber-900 bg-amber-50 border border-amber-200 p-3 rounded-xl font-medium"><i class="fas fa-lock text-amber-600"></i> ${m.tips.length} Tipp(s) abgegeben. Werden nach Freigabe/Spiel sichtbar.</div>`;
+                } else {
+                    tipsHtml = '<div class="grid grid-cols-1 sm:grid-cols-2 gap-2.5 mt-2">';
+                    m.tips.forEach(t => {
+                        let badge = '';
+                        if (isEvaluated && m.payouts && m.payouts[t.playerName] !== undefined) {
+                            const payout = m.payouts[t.playerName];
+                            badge = payout > 0 ? `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-lg">Gewinn: ${formatEuro(payout)}</span>` : `<span class="bg-red-100 text-red-800 text-[10px] font-bold px-2 py-0.5 rounded-lg">Kein Treffer</span>`;
+                        }
+                        tipsHtml += `
+                            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200 flex items-center justify-between text-slate-900 shadow-sm">
+                                <span class="text-xs font-bold">${escapeHtml(t.playerName)}</span>
+                                <div class="flex items-center gap-2">
+                                    <span class="text-xs font-black text-hsv-darkblue bg-blue-50 px-2.5 py-1 rounded-lg border border-blue-200">${t.homeGoals} : ${t.awayGoals}</span>
+                                    ${badge}
+                                </div>
+                            </div>
+                        `;
+                    });
+                    tipsHtml += '</div>';
+                }
+
+                container.innerHTML += `
+                    <div class="bg-slate-50 p-4 rounded-2xl border border-slate-200 space-y-3 text-slate-900">
+                        <div class="flex items-center justify-between border-b border-slate-200 pb-2.5">
+                            <div>
+                                <span class="text-sm font-extrabold text-hsv-darkblue">${escapeHtml(m.homeTeam)} vs. ${escapeHtml(m.awayTeam)}</span>
+                                <span class="text-xs text-slate-500 block">${formatDate(m.time)}</span>
+                            </div>
+                            <div>${isEvaluated ? `<span class="bg-emerald-100 text-emerald-800 text-xs font-black px-3 py-1 rounded-full">Erg: ${m.result.home}:${m.result.away}</span>` : `<span class="bg-blue-100 text-hsv-blue text-xs font-bold px-3 py-1 rounded-full">Offen</span>`}</div>
+                        </div>
+                        <div>${tipsHtml}</div>
+                    </div>
+                `;
+            });
+        }
+
+        function toggleAdminPanel() {
+            if (isAdminLoggedIn) {
+                isAdminLoggedIn = false;
+                document.getElementById('admin-panel').classList.add('hidden');
+                document.getElementById('admin-btn-label').textContent = 'Admin Login';
+            } else {
+                showCustomPrompt('Admin Login', 'Passwort eingeben (1887):', (pass) => {
+                    if (pass === ADMIN_PASS) {
+                        isAdminLoggedIn = true;
+                        document.getElementById('admin-panel').classList.remove('hidden');
+                        document.getElementById('admin-btn-label').textContent = 'Logout';
+                        renderApp();
+                        showCustomAlert('Erfolg', 'Admin-Modus aktiv.');
+                    } else {
+                        showCustomAlert('Fehler', 'Falsches Passwort!');
+                    }
+                });
+            }
+        }
+
+        function saveAdminJackpot() {
+            const val = parseFloat(document.getElementById('admin-jackpot-input').value);
+            if (!isNaN(val) && val >= 0) {
+                state.jackpot = val;
+                markStateChanged();
+                showCustomAlert('Gespeichert', 'Jackpot in der Cloud aktualisiert.');
+            }
+        }
+
+        function confirmResetJackpot() {
+            showCustomConfirm('Zurücksetzen', 'Jackpot auf 0 € setzen?', () => {
+                state.jackpot = 0;
+                markStateChanged();
+            });
+        }
+
+        function registerNewPlayer(e) {
+            e.preventDefault();
+            const input = document.getElementById('admin-new-player');
+            let name = input.value.trim().split(' ')[0];
+            if (!name) return;
+
+            if (!state.players.some(p => p.toLowerCase() === name.toLowerCase())) {
+                state.players.push(name);
+                if (!state.manualAdjustments) state.manualAdjustments = {};
+                state.manualAdjustments[name] = 0;
+                markStateChanged();
+                input.value = '';
+            } else {
+                showCustomAlert('Hinweis', 'Vorname existiert bereits.');
+            }
+        }
+
+        function renderRegisteredPlayersChips() {
+            const container = document.getElementById('registered-players-list');
+            container.innerHTML = '';
+            state.players.forEach(p => {
+                const safeP = escapeHtml(p);
+                container.innerHTML += `
+                    <span class="bg-white border border-slate-300 text-slate-800 text-xs px-3 py-1.5 rounded-xl flex items-center gap-2 font-semibold shadow-sm">
+                        ${safeP}
+                        <button type="button" class="del-player-btn text-slate-400 hover:text-red-600 cursor-pointer" data-player="${safeP}"><i class="fas fa-times"></i></button>
+                    </span>
+                `;
+            });
+
+            container.querySelectorAll('.del-player-btn').forEach(btn => {
+                btn.addEventListener('click', () => confirmDeletePlayer(btn.getAttribute('data-player')));
+            });
+        }
+
+        function confirmDeletePlayer(playerName) {
+            showCustomConfirm('Löschen', `Tipper ${playerName} entfernen?`, () => {
+                state.players = state.players.filter(p => p !== playerName);
+                delete state.manualAdjustments[playerName];
+                markStateChanged();
+            });
+        }
+
+        function renderAdminPlayerBalancesEdit() {
+            const container = document.getElementById('admin-player-balances-edit');
+            container.innerHTML = '';
+            state.players.forEach(p => {
+                const adj = state.manualAdjustments[p] || 0;
+                const safeP = escapeHtml(p);
+                container.innerHTML += `
+                    <div class="bg-white p-2.5 rounded-xl border border-slate-200 flex items-center justify-between text-xs text-slate-900">
+                        <span class="font-bold">${safeP}</span>
+                        <div class="flex items-center gap-2">
+                            <input type="number" step="0.50" id="adj-input-${safeP}" value="${adj.toFixed(2)}" class="w-20 bg-slate-50 border rounded-lg px-2 py-1 text-center font-bold">
+                            <button type="button" class="save-adj-btn bg-hsv-blue text-white font-bold px-3 py-1 rounded-lg cursor-pointer" data-player="${safeP}">Speichern</button>
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.querySelectorAll('.save-adj-btn').forEach(btn => {
+                btn.addEventListener('click', () => savePlayerAdjustment(btn.getAttribute('data-player')));
+            });
+        }
+
+        function savePlayerAdjustment(playerName) {
+            const inputEl = document.getElementById(`adj-input-${playerName}`);
+            if (!inputEl) return;
+            const val = parseFloat(inputEl.value);
+            if (!isNaN(val)) {
+                if (!state.manualAdjustments) state.manualAdjustments = {};
+                state.manualAdjustments[playerName] = val;
+                markStateChanged();
+                showCustomAlert('Gespeichert', `Bilanz für ${playerName} angepasst.`);
+            }
+        }
+
+        function createNewMatch(e) {
+            e.preventDefault();
+            state.matches.push({
+                id: 'm_' + Date.now(),
+                homeTeam: document.getElementById('admin-home-team').value.trim(),
+                awayTeam: document.getElementById('admin-away-team').value.trim(),
+                time: document.getElementById('admin-match-time').value,
+                status: 'OPEN',
+                publishTips: false,
+                result: null,
+                tips: []
+            });
+            markStateChanged();
+            showCustomAlert('Erfolg', 'Spiel in der Cloud angelegt.');
+            document.getElementById('admin-away-team').value = '';
+        }
+
+        function renderAdminMatchesList() {
+            const container = document.getElementById('admin-matches-list');
+            container.innerHTML = '';
+            state.matches.forEach(m => {
+                let tipsRows = '';
+                m.tips.forEach(t => {
+                    tipsRows += `
+                        <div class="flex items-center justify-between text-xs bg-white p-2 rounded-lg border border-slate-200 mt-1 text-slate-900">
+                            <span><strong>${escapeHtml(t.playerName)}</strong>: ${t.homeGoals}:${t.awayGoals}</span>
+                            <button type="button" class="del-tip-btn text-red-500 hover:text-red-700 p-1 cursor-pointer" data-match="${m.id}" data-tip="${t.id}"><i class="fas fa-trash-can"></i></button>
+                        </div>
+                    `;
+                });
+
+                container.innerHTML += `
+                    <div class="bg-white p-4 rounded-xl border border-slate-200 space-y-3 text-slate-900">
+                        <div class="flex items-center justify-between border-b pb-2">
+                            <span class="font-bold text-xs">${escapeHtml(m.homeTeam)} vs. ${escapeHtml(m.awayTeam)}</span>
+                            <button type="button" class="del-match-btn text-red-500 text-xs font-semibold cursor-pointer" data-match="${m.id}"><i class="fas fa-trash"></i> Löschen</button>
+                        </div>
+                        ${m.status === 'OPEN' ? `
+                            <div class="flex items-center gap-2 pt-1">
+                                <input type="number" id="res-home-${m.id}" placeholder="Heim" class="w-16 bg-slate-50 border rounded-lg px-2 py-1 text-center text-xs font-bold">
+                                <span class="text-slate-400 font-bold">:</span>
+                                <input type="number" id="res-away-${m.id}" placeholder="Ausw." class="w-16 bg-slate-50 border rounded-lg px-2 py-1 text-center text-xs font-bold">
+                                <button type="button" class="eval-match-btn bg-emerald-600 text-white text-xs font-bold px-3 py-1 rounded-lg cursor-pointer" data-match="${m.id}">Auswerten</button>
+                                <button type="button" class="pub-tips-btn ml-auto bg-slate-100 text-xs px-2.5 py-1 rounded-lg border font-semibold cursor-pointer" data-match="${m.id}"><i class="fas fa-eye"></i> ${m.publishTips ? 'Sichtbar' : 'Versteckt'}</button>
+                            </div>
+                        ` : `<div class="text-xs text-emerald-700 font-bold">Endergebnis: ${m.result.home} : ${m.result.away}</div>`}
+                        <div class="pt-2 border-t">
+                            <span class="text-xs font-bold">Tipps (${m.tips.length}):</span>
+                            ${m.tips.length === 0 ? '<div class="text-xs text-slate-400 italic">Keine</div>' : tipsRows}
+                        </div>
+                    </div>
+                `;
+            });
+
+            container.querySelectorAll('.del-tip-btn').forEach(btn => {
+                btn.addEventListener('click', () => confirmDeleteTip(btn.getAttribute('data-match'), btn.getAttribute('data-tip')));
+            });
+            container.querySelectorAll('.del-match-btn').forEach(btn => {
+                btn.addEventListener('click', () => confirmDeleteMatch(btn.getAttribute('data-match')));
+            });
+            container.querySelectorAll('.eval-match-btn').forEach(btn => {
+                btn.addEventListener('click', () => evaluateMatch(btn.getAttribute('data-match')));
+            });
+            container.querySelectorAll('.pub-tips-btn').forEach(btn => {
+                btn.addEventListener('click', () => togglePublishTips(btn.getAttribute('data-match')));
+            });
+        }
+
+        function confirmDeleteTip(matchId, tipId) {
+            showCustomConfirm('Löschen', 'Tipp entfernen?', () => {
+                const match = state.matches.find(m => m.id === matchId);
+                if (match) {
+                    match.tips = match.tips.filter(t => t.id !== tipId);
+                    markStateChanged();
+                }
+            });
+        }
+
+        function confirmDeleteMatch(matchId) {
+            showCustomConfirm('Löschen', 'Spiel löschen?', () => {
+                state.matches = state.matches.filter(m => m.id !== matchId);
+                markStateChanged();
+            });
+        }
+
+        function togglePublishTips(matchId) {
+            const match = state.matches.find(m => m.id === matchId);
+            if (match) {
+                match.publishTips = !match.publishTips;
+                markStateChanged();
+            }
+        }
+
+        function evaluateMatch(matchId) {
+            const homeInput = document.getElementById(`res-home-${matchId}`);
+            const awayInput = document.getElementById(`res-away-${matchId}`);
+            if (!homeInput || !awayInput) return;
+
+            const homeRes = parseInt(homeInput.value);
+            const awayRes = parseInt(awayInput.value);
+            if (isNaN(homeRes) || isNaN(awayRes)) {
+                showCustomAlert('Fehler', 'Bitte gültiges Endergebnis eintragen.');
+                return;
+            }
+
+            const match = state.matches.find(m => m.id === matchId);
+            if (!match) return;
+
+            match.result = { home: homeRes, away: awayRes };
+            match.status = 'EVALUATED';
+            match.payouts = {};
+
+            const totalTips = match.tips.length;
+            const matchPool = totalTips * 0.50; // Gesamter Einsatz dieses Spiels
+            
+            // Regel: 50 Cent pro Person vor dem Spiel in Spielpreis, Rest direkt in Jackpot
+            // Bei z.B. 3 Spielern = 1,50 € Gesamtpool. 0,50 € Spielpreis, 1,00 € in den Jackpot.
+            const gamePrice = Math.min(0.50, matchPool); 
+            const addedToJackpot = Math.max(0, matchPool - 0.50);
+            state.jackpot += addedToJackpot;
+
+            const exactTippers = [];
+            const tendencyTippers = [];
+
+            match.tips.forEach(t => {
+                const isExact = (t.homeGoals === homeRes && t.awayGoals === awayRes);
+                const isTendency = !isExact && ((homeRes > awayRes && t.homeGoals > t.awayGoals) || (homeRes < awayRes && t.homeGoals < t.awayGoals) || (homeRes === awayRes && t.homeGoals === t.awayGoals));
+                if (isExact) exactTippers.push(t.playerName);
+                else if (isTendency) tendencyTippers.push(t.playerName);
+            });
+
+            if (exactTippers.length > 0) {
+                const totalWin = gamePrice + state.jackpot;
+                const winPerPlayer = totalWin / exactTippers.length;
+                exactTippers.forEach(p => match.payouts[p] = winPerPlayer);
+                state.jackpot = 0.00;
+                showCustomAlert('JACKPOT!', `${exactTippers.join(', ')} gewinnen je ${formatEuro(winPerPlayer)}!`);
+            } else if (tendencyTippers.length > 0) {
+                // Bei richtiger Tendenz genau 50 Cent (0,50 €) Auszahlung
+                const payoutTotal = Math.min(gamePrice, 0.50);
+                const winPerPlayer = payoutTotal / tendencyTippers.length;
+                tendencyTippers.forEach(p => match.payouts[p] = winPerPlayer);
+                state.jackpot += Math.max(0, gamePrice - payoutTotal);
+                showCustomAlert('Tendenz', `Tendenzgewinner erhalten je ${formatEuro(winPerPlayer)} aus dem Spielpreis.`);
+            } else {
+                state.jackpot += gamePrice;
+                showCustomAlert('Kein Treffer', 'Spielpreis wandert in den Jackpot.');
+            }
+
+            markStateChanged();
+        }
+
+        function downloadICS() {
+            const nextMatch = state.matches.find(m => m.status === 'OPEN');
+            const title = nextMatch ? `Tipp abgeben: ${nextMatch.homeTeam} vs. ${nextMatch.awayTeam}` : 'HSV Tippspiel';
+            const icsData = `BEGIN:VCALENDAR\nVERSION:2.0\nBEGIN:VEVENT\nSUMMARY:${title}\nEND:VEVENT\nEND:VCALENDAR`;
+            const blob = new Blob([icsData], { type: 'text/calendar;charset=utf-8' });
+            const link = document.createElement('a');
+            link.href = window.URL.createObjectURL(blob);
+            link.setAttribute('download', 'HSV_Tippspiel.ics');
+            document.body.appendChild(link);
+            link.click();
+            link.remove();
+        }
+
+        function showCustomAlert(title, message) {
+            document.getElementById('modal-title').innerHTML = `<i class="fas fa-circle-info text-hsv-blue"></i> ${escapeHtml(title)}`;
+            document.getElementById('modal-message').textContent = message;
+            document.getElementById('modal-actions').innerHTML = `<button type="button" id="modal-ok-btn" class="bg-hsv-blue text-white px-5 py-2 rounded-xl text-xs font-extrabold cursor-pointer">OK</button>`;
+            document.getElementById('custom-modal').classList.remove('hidden');
+            document.getElementById('modal-ok-btn').addEventListener('click', closeModal);
+        }
+
+        function showCustomConfirm(title, message, onConfirm) {
+            document.getElementById('modal-title').innerHTML = `<i class="fas fa-triangle-exclamation text-amber-500"></i> ${escapeHtml(title)}`;
+            document.getElementById('modal-message').textContent = message;
+            confirmCallback = onConfirm;
+            document.getElementById('modal-actions').innerHTML = `
+                <button type="button" id="modal-cancel-btn" class="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Abbrechen</button>
+                <button type="button" id="modal-confirm-btn" class="bg-red-600 text-white px-4 py-2 rounded-xl text-xs font-extrabold cursor-pointer">Bestätigen</button>
+            `;
+            document.getElementById('custom-modal').classList.remove('hidden');
+            document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
+            document.getElementById('modal-confirm-btn').addEventListener('click', () => {
+                closeModal();
+                if (confirmCallback) { confirmCallback(); confirmCallback = null; }
+            });
+        }
+
+        function showCustomPrompt(title, message, onSubmit) {
+            document.getElementById('modal-title').innerHTML = `<i class="fas fa-key text-hsv-blue"></i> ${escapeHtml(title)}`;
+            document.getElementById('modal-message').innerHTML = `${escapeHtml(message)}<input type="password" id="prompt-input" class="w-full bg-slate-50 border rounded-xl p-2.5 text-slate-900 mt-2.5 text-xs">`;
+            document.getElementById('modal-actions').innerHTML = `
+                <button type="button" id="modal-cancel-btn" class="bg-slate-100 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold cursor-pointer">Abbrechen</button>
+                <button type="button" id="modal-prompt-submit-btn" class="bg-hsv-blue text-white px-4 py-2 rounded-xl text-xs font-extrabold cursor-pointer">Einloggen</button>
+            `;
+            document.getElementById('custom-modal').classList.remove('hidden');
+            document.getElementById('modal-cancel-btn').addEventListener('click', closeModal);
+            document.getElementById('modal-prompt-submit-btn').addEventListener('click', () => {
+                const val = document.getElementById('prompt-input').value;
+                closeModal();
+                onSubmit(val);
+            });
+        }
+
+        function closeModal() { document.getElementById('custom-modal').classList.add('hidden'); }
+        function openRulesModal() { document.getElementById('rules-modal').classList.remove('hidden'); }
+        function closeRulesModal() { document.getElementById('rules-modal').classList.add('hidden'); }
+
+        function formatEuro(val) { return (val || 0).toLocaleString('de-DE', { style: 'currency', currency: 'EUR' }); }
+        function formatDate(isoStr) { return isoStr ? new Date(isoStr).toLocaleString('de-DE', { day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit' }) + ' Uhr' : ''; }
+        function escapeHtml(str) { return (str || '').replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;"); }
+    </script>
+</body>
+</html>
